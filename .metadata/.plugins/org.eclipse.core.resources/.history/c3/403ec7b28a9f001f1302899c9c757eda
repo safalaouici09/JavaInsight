@@ -1,0 +1,183 @@
+ package main;
+
+import processor.Processor;
+import utils.cluster.ICluster;
+
+import java.io.*;
+import java.util.Scanner;
+import java.util.Set;
+
+import static java.lang.String.format;
+
+public class Application {
+    private static final String PROJECTS_DIRECTORY = "../projectsJava";
+    private static String TEST_PROJECT_PATH;
+    private Scanner sc;
+    private StringBuilder menu;
+
+    /**
+     * Constructeur par défaut pour la classe {@link Application}
+     */
+    public Application() {
+        sc = new Scanner(System.in);
+        buildMenu();
+    }
+
+    /**
+     * Méthode pour initialiser le menu.
+     */
+    private void buildMenu() {
+        menu = new StringBuilder();
+        
+       
+        menu.append("1. Calculer le couplage entre deux classes.\n");
+        menu.append("2. Générer un graphe pondéré.\n");
+        menu.append("3. Générer un dendrogramme.\n");
+        menu.append("4. Identification de modules.\n");
+        menu.append("5. Quitter l’application.\n");
+    }
+
+    /**
+     * Affiche le menu de l'application.
+     */
+    private void displayMenu() {
+        System.out.print(menu);
+    }
+
+    /**
+     * Interaction de l'utilisateur avec l'application.
+     * @param processor Pour accéder aux données recueillies.
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    private void chooseAFeatures(Processor processor) throws IOException, InterruptedException {
+        String choice = "";
+        String graphName;
+        String classe1;
+        String classe2;
+        ICluster dendrogramme = null;
+        while (!choice.equals("5")) {
+            displayMenu();
+            Thread.sleep(500);
+            System.out.print("\nCHOISIR UNE OPTION : ");
+            choice = sc.nextLine();
+            switch (choice.trim()) {
+               
+                case "1":
+                    System.err.println("Saisissez les deux classes pour lesquelles vous souhaitez déterminer un couplage : ");
+                    Thread.sleep(500);
+                    System.out.print("classe1 : ");
+                    classe1 = sc.nextLine().trim();
+                    System.out.print("classe2 : ");
+                    classe2 = sc.nextLine().trim();
+                    System.out.println(format("Couplage (%s, %s) = %f.", classe1, classe2, processor.couplage(classe1, classe2)));
+                    Thread.sleep(500);
+                    break;
+                case "2":
+                    System.err.println("Génération du graphe de couplage pondéré ...");
+                    Thread.sleep(500);
+                  
+                   
+                    processor.writeWeightedCouplingGraphInDotFile("graphe_pond");
+                    Thread.sleep(500);
+                    break;
+                case "3":
+                    dendrogramme = processor.clusteringHierarchic();
+                    System.out.println(dendrogramme);
+                    Thread.sleep(500);
+                    break;
+                case "4":
+                    if (dendrogramme == null) {
+                        System.err.println("Générer le dendrogramme à partir de l'option 3 avant d'employer l'option 4.");
+                        break;
+                    }
+                    System.err.print("Préciser la valeur de CP : ");
+                   float CP = 0.0;
+                   String input = sc.nextLine();  // Lire l'entrée sous forme de chaîne
+                   try {
+                        CP = Float.parseFloat(input);  // Convertir la chaîne en float
+                       // Utilisez la valeur de CP ici pour le traitement suivant
+                   } catch (NumberFormatException e) {
+                       System.err.println("Erreur : Veuillez entrer une valeur numérique valide.");
+                   }
+
+                    Set<ICluster> modules = processor.identifyModules(dendrogramme, CP);
+                    String pluriel = modules.size() > 1 ? "s" : "";
+                    System.err.println(format("Module%s sélectionné%s : ", pluriel, pluriel));
+                    for (ICluster groupe : modules) {
+                        System.out.println("- " + groupe.toString());
+                    }
+                    Thread.sleep(1000);
+                    break;
+                case "5":
+                    System.out.println("Quitter l'application.");
+                    break;
+                default:
+                    System.err.println("Choix incorrect ... Veuillez recommencer !");
+                    Thread.sleep(1000);
+                    break;
+            }
+        }
+    }
+
+    /**
+     * Lancer l'application en sélectionnant un projet.
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    private void launch() throws IOException, InterruptedException {
+        selectAndAnalyzeProject();
+    }
+
+    /**
+     * Sélection et analyse d'un nouveau projet.
+     */
+    private void selectAndAnalyzeProject() {
+        try {
+            File projectDir = new File(PROJECTS_DIRECTORY);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                System.err.println("Erreur : Le répertoire des projets " + PROJECTS_DIRECTORY + " n'existe pas ou n'est pas un dossier valide.");
+                return;
+            }
+
+            System.out.println("Projets disponibles :");
+            listProjectsInDirectory(projectDir);
+
+            System.out.println("Veuillez entrer le nom du projet que vous souhaitez analyser :");
+            String projectName = sc.nextLine();
+            File selectedProject = new File(PROJECTS_DIRECTORY, projectName );
+
+            while (!selectedProject.exists() || !selectedProject.isDirectory()) {
+                System.err.println("Erreur : Le répertoire src du projet " + selectedProject.getPath() + " n'existe pas. Veuillez réessayer :");
+                projectName = sc.nextLine();
+                selectedProject = new File(PROJECTS_DIRECTORY, projectName + "/src");
+            }
+
+            TEST_PROJECT_PATH = selectedProject.getCanonicalPath();
+            Processor processor = new Processor();
+            processor.analyse(TEST_PROJECT_PATH);
+
+            chooseAFeatures(processor);
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void listProjectsInDirectory(File projectsDir) {
+        File[] projects = projectsDir.listFiles(File::isDirectory);
+        if (projects != null) {
+            for (File project : projects) {
+                System.out.println("- " + project.getName());
+            }
+        } else {
+            System.err.println("Erreur : Impossible de lister les projets dans " + projectsDir.getPath());
+        }
+    }
+
+    public static void main(String[] args) throws IOException, InterruptedException {
+       
+
+        Application application = new Application();
+        application.launch();
+    }
+}  
